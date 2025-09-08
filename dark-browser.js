@@ -86,21 +86,19 @@ class ConnectionManager extends EventTarget {
 class RequestProcessor {
   constructor() {
     this.activeOperations = new Map();
+    this.cancelledOperations = new Set();
     this.targetDomain = "generativelanguage.googleapis.com";
-    this.maxRetries = 1; // 最多尝试3次
+    this.maxRetries = 3; // 最多尝试3次
     this.retryDelay = 2000; // 每次重试前等待2秒
   }
 
-  // --- MODIFIED: execute 方法 ---
-  // execute 现在返回一个包含 Promise 和超时取消功能的对象
   execute(requestSpec, operationId) {
-    const IDLE_TIMEOUT_DURATION = 600000; // 空闲超时改为600秒
+    const IDLE_TIMEOUT_DURATION = 600000;
     const abortController = new AbortController();
     this.activeOperations.set(operationId, abortController);
 
     let timeoutId = null;
 
-    // 创建一个可以被外部取消的超时Promise
     const startIdleTimeout = () => {
       return new Promise((_, reject) => {
         timeoutId = setTimeout(() => {
@@ -113,7 +111,6 @@ class RequestProcessor {
       });
     };
 
-    // NEW: 用于从外部取消超时的函数
     const cancelTimeout = () => {
       if (timeoutId) {
         clearTimeout(timeoutId);
@@ -147,12 +144,11 @@ class RequestProcessor {
             throw error;
           }
 
-          // 请求成功，将response对象传递出去
           resolve(response);
           return;
         } catch (error) {
           if (error.name === "AbortError") {
-            reject(error); // 如果是超时导致的终止，直接拒绝
+            reject(error);
             return;
           }
           const isNetworkError = error.message.includes("Failed to fetch");
@@ -176,18 +172,16 @@ class RequestProcessor {
       }
     });
 
-    // 将“请求重试”和“空闲超时”进行赛跑
     const responsePromise = Promise.race([attemptPromise, startIdleTimeout()]);
 
-    // 返回Promise和取消函数
     return { responsePromise, cancelTimeout };
   }
 
-  // --- constructUrl, generateRandomString, buildRequestConfig, sanitizeHeaders 等其他方法保持不变 ---
   cancelAllOperations() {
     this.activeOperations.forEach((controller, id) => controller.abort());
     this.activeOperations.clear();
   }
+
   _constructUrl(requestSpec) {
     let pathSegment = requestSpec.path.startsWith("/")
       ? requestSpec.path.substring(1)
@@ -212,6 +206,7 @@ class RequestProcessor {
       queryString ? "?" + queryString : ""
     }`;
   }
+
   _generateRandomString(length) {
     const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
     let result = "";
@@ -219,6 +214,7 @@ class RequestProcessor {
       result += chars.charAt(Math.floor(Math.random() * chars.length));
     return result;
   }
+
   _buildRequestConfig(requestSpec, signal) {
     const config = {
       method: requestSpec.method,
@@ -233,7 +229,7 @@ class RequestProcessor {
         const bodyObj = JSON.parse(requestSpec.body);
         if (bodyObj.contents?.[0]?.parts?.[0]?.text) {
           bodyObj.contents[bodyObj.contents.length - 1].parts[
-            bodyObj.contents[bodyObj.contents.length - 1].parts.length - 1
+            bodyObj.contents[body.contents.length - 1].parts.length - 1
           ].text += `\n\n[sig:${this._generateRandomString(5)}]`;
           Logger.output("已向提示文本末尾添加伪装字符串。");
         }
@@ -244,6 +240,7 @@ class RequestProcessor {
     }
     return config;
   }
+
   _sanitizeHeaders(headers) {
     const sanitized = { ...headers };
     [
@@ -258,6 +255,14 @@ class RequestProcessor {
       "sec-fetch-dest",
     ].forEach((h) => delete sanitized[h]);
     return sanitized;
+  }
+  cancelOperation(operationId) {
+    this.cancelledOperations.add(operationId); // 核心：将ID加入取消集合
+    const controller = this.activeOperations.get(operationId);
+    if (controller) {
+      Logger.output(`收到取消指令，正在中止操作 #${operationId}...`);
+      controller.abort();
+    }
   }
 }
 
@@ -295,15 +300,32 @@ class ProxySystem extends EventTarget {
     let requestSpec = {};
     try {
       requestSpec = JSON.parse(messageData);
-      Logger.output(
-        `收到请求: ${requestSpec.method} ${requestSpec.path} (模式: ${
-          requestSpec.streaming_mode || "fake"
-        })`
-      );
-      await this._processProxyRequest(requestSpec);
+
+      // --- 核心修改：根据 event_type 分发任务 ---
+      switch (requestSpec.event_type) {
+        case "cancel_request":
+          // 如果是取消指令，则调用取消方法
+          this.requestProcessor.cancelOperation(requestSpec.request_id);
+          break;
+        default:
+          // 默认情况，认为是代理请求
+          Logger.output(
+            `收到请求: ${requestSpec.method} ${requestSpec.path} (模式: ${
+              requestSpec.streaming_mode || "fake"
+            })`
+          );
+          await this._processProxyRequest(requestSpec);
+          break;
+      }
     } catch (error) {
       Logger.output("消息处理错误:", error.message);
-      this._sendErrorResponse(error, requestSpec.request_id);
+      // 只有在代理请求处理中出错时才发送错误响应
+      if (
+        requestSpec.request_id &&
+        requestSpec.event_type !== "cancel_request"
+      ) {
+        this._sendErrorResponse(error, requestSpec.request_id);
+      }
     }
   }
 
@@ -312,57 +334,47 @@ class ProxySystem extends EventTarget {
     const operationId = requestSpec.request_id;
     const mode = requestSpec.streaming_mode || "fake";
 
-    const { responsePromise, cancelTimeout } = this.requestProcessor.execute(
-      requestSpec,
-      operationId
-    );
-
     try {
+      if (this.requestProcessor.cancelledOperations.has(operationId)) {
+        throw new DOMException("The user aborted a request.", "AbortError");
+      }
+      const { responsePromise, cancelTimeout } = this.requestProcessor.execute(
+        requestSpec,
+        operationId
+      );
       const response = await responsePromise;
-      this._transmitHeaders(response, operationId);
+      if (this.requestProcessor.cancelledOperations.has(operationId)) {
+        throw new DOMException("The user aborted a request.", "AbortError");
+      }
 
+      this._transmitHeaders(response, operationId);
       const reader = response.body.getReader();
       const textDecoder = new TextDecoder();
       let timeoutCancelled = false;
-      let fullBody = ""; // 用于假流式模式
-
-      // [新增] 用于记录最终结束原因的变量
+      let fullBody = "";
       let finalFinishReason = "UNKNOWN";
 
       while (true) {
         const { done, value } = await reader.read();
-
-        if (done) {
-          break;
-        }
-
+        if (done) break;
         if (!timeoutCancelled) {
           cancelTimeout();
           timeoutCancelled = true;
         }
-
         const chunk = textDecoder.decode(value, { stream: true });
-
-        // [新增] 在每个数据块中解析和记录 finishReason
         if (mode === "real") {
           const lines = chunk.split("\n");
           for (const line of lines) {
             if (line.startsWith("data: ")) {
               try {
                 const jsonData = JSON.parse(line.substring(5));
-                if (
-                  jsonData.candidates &&
-                  jsonData.candidates[0].finishReason
-                ) {
+                if (jsonData.candidates?.[0]?.finishReason) {
                   finalFinishReason = jsonData.candidates[0].finishReason;
                 }
-              } catch (e) {
-                /* 忽略JSON解析错误 */
-              }
+              } catch (e) {}
             }
           }
         }
-
         if (mode === "real") {
           this._transmitChunk(chunk, operationId);
         } else {
@@ -370,43 +382,39 @@ class ProxySystem extends EventTarget {
         }
       }
 
-      // --- [新增] 流结束后，根据模式输出最终状态日志 ---
-      Logger.output("流读取完成。");
-
+      Logger.output("数据流已读取完成。");
       if (mode === "real") {
-        // 真流式模式：基于流过程中记录的最后一个 finishReason 判断
-        if (finalFinishReason === "STOP") {
-          Logger.output("✅ 响应成功");
-        } else {
-          Logger.output(`🤔 响应结束异常，原因: ${finalFinishReason}`);
-        }
+        Logger.output(`✅ [诊断] 响应结束，原因: ${finalFinishReason}`);
       } else {
-        // 假流式模式：解析完整的响应体来判断
-        let logMessage;
         try {
           const parsedBody = JSON.parse(fullBody);
           const finishReason = parsedBody.candidates?.[0]?.finishReason;
-
-          if (finishReason === "STOP") {
-            logMessage = "✅ 响应成功";
-          } else {
-            logMessage = `🤔 响应结束异常，原因: ${finishReason || "未知"}`;
+          const safetyRatings = parsedBody.candidates?.[0]?.safetyRatings;
+          Logger.output(`✅ [诊断] 响应结束，原因: ${finishReason || "未知"}`);
+          if (safetyRatings) {
+            Logger.output(
+              `[诊断] 安全评级详情: ${JSON.stringify(safetyRatings)}`
+            );
           }
+          this._transmitChunk(fullBody, operationId);
         } catch (e) {
-          logMessage = `⚠️ 响应非JSON格式`;
+          Logger.output(`⚠️ [诊断] 响应体不是有效的JSON格式。`);
+          this._transmitChunk(fullBody, operationId);
         }
-        Logger.output(logMessage);
-        this._transmitChunk(fullBody, operationId);
       }
-
       this._transmitStreamEnd(operationId);
     } catch (error) {
-      Logger.output(`❌ 错误: ${error.message}`);
-      if (error.name !== "AbortError") {
-        this._sendErrorResponse(error, operationId);
+      // --- 核心修改：区分 AbortError 和其他错误 ---
+      if (error.name === "AbortError") {
+        Logger.output(`[诊断] 操作 #${operationId} 已被用户中止。`);
       } else {
-        this._sendErrorResponse(error, operationId);
+        Logger.output(`❌ 请求处理失败: ${error.message}`);
       }
+      // 无论如何，都需要将最终状态报告给服务器
+      this._sendErrorResponse(error, operationId);
+    } finally {
+      this.requestProcessor.activeOperations.delete(operationId);
+      this.requestProcessor.cancelledOperations.delete(operationId);
     }
   }
 
@@ -445,12 +453,16 @@ class ProxySystem extends EventTarget {
     this.connectionManager.transmit({
       request_id: operationId,
       event_type: "error",
-      status: 504,
+      status: error.status || 504,
       message: `代理端浏览器错误: ${error.message || "未知错误"}`,
     });
-    Logger.output("已将错误信息发送回服务器");
+    // --- 核心修改：根据错误类型，使用不同的日志措辞 ---
+    if (error.name === 'AbortError') {
+        Logger.output("已将“中止”状态发送回服务器");
+    } else {
+        Logger.output("已将“错误”信息发送回服务器");
+    }
   }
-}
 
 async function initializeProxySystem() {
   // 清理旧的日志

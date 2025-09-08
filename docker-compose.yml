@@ -18,11 +18,10 @@ services:
       - RETRY_DELAY=3000
       - IMMEDIATE_SWITCH_STATUS_CODES=429,503
       - TZ=Asia/Shanghai
-      
     ports:
       - "8889:8889"
-      
     volumes:
-      - ./auth:/home/user/auth
-      - ./debug-screenshots:/home/user/debug-screenshots
+      # 确保容器内的路径是 /app/...
+      - ./auth:/app/auth
+      - ./debug-screenshots:/app/debug-screenshots
       

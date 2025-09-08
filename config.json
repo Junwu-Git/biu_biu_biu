@@ -13,6 +13,9 @@
   "failureThreshold": 0,
   "_failureThreshold_comment": "连续外部请求失败多少次后触发账号切换，0为禁用此设置，实际每次报错切换的请求失败数为该变量与下一个变量的相乘。环境变量: FAILURE_THRESHOLD",
 
+ "switchOnUses": 0,
+  "_switchOnUses_comment": "每个账号连续处理多少次生成请求后自动切换，0为禁用。环境变量: SWITCH_ON_USES",
+
   "maxRetries": 3,
   "_maxRetries_comment": "单个外部请求失败后内部自动重试的最大次数。环境变量: MAX_RETRIES",
   
@@ -25,7 +28,7 @@
   "initialAuthIndex": null,
   "_initialAuthIndex_comment": "初始启动的账号索引，null代表不指定。环境变量: INITIAL_AUTH_INDEX",
 
-  "immediateSwitchStatusCodes": ["429,503"],
+  "immediateSwitchStatusCodes": [429,503],
   "_immediateSwitchStatusCodes_comment": "用于设置立即切换账号的报错代码，不受报错次数限制影响，可以包含一个或多个用英文逗号分隔的状态码。环境变量: IMMEDIATE_SWITCH_STATUS_CODES",
 
   "debugMode": false,

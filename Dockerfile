@@ -1,53 +1,53 @@
+# 最终推荐的 Dockerfile
+# 它融合了版本B的高效分层和您现有的entrypoint权限管理方案
+
+# 1. 使用稳定、轻量的基础镜像
 FROM node:18-slim
 
-# 安装必要的系统依赖，并新增 gosu 用于权限切换
+# 2. 将工作目录设置得更通用
+WORKDIR /app
+
+# 3. [来自您的Dockerfile] 拷贝并设置入口脚本
+# 这是固定不变的，放在前面
+COPY entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# 4. [来自Dockerfile(B)] 安装几乎不会改变的系统依赖
 RUN apt-get update && apt-get install -y \
-    wget \
-    fonts-liberation \
-    libasound2 \
-    libatk-bridge2.0-0 \
-    libatk1.0-0 \
-    libatspi2.0-0 \
-    libcups2 \
-    libdbus-1-3 \
-    libdrm2 \
-    libgtk-3-0 \
-    libnspr4 \
-    libnss3 \
-    libx11-xcb1 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxfixes3 \
-    libxrandr2 \
-    libxss1 \
-    libxtst6 \
-    xvfb \
-    gosu \
+    curl gosu \
+    libasound2 libatk-bridge2.0-0 libatk1.0-0 libatspi2.0-0 libcups2 \
+    libdbus-1-3 libdrm2 libgbm1 libgtk-3-0 libnspr4 libnss3 libx11-6 \
+    libx11-xcb1 libxcb1 libxcomposite1 libxdamage1 libxext6 libxfixes3 \
+    libxrandr2 libxss1 libxtst6 xvfb \
     && rm -rf /var/lib/apt/lists/*
 
-# 创建一个默认的 user 用户 (UID/GID 在启动时会被 entrypoint 脚本修改)
-RUN useradd -m -s /bin/bash user
-WORKDIR /home/user
-
-# 安装依赖
-COPY package*.json ./
+# 5. [来自Dockerfile(B)] 安装项目依赖
+# 只有 package.json 变动时，这一层才会重新执行
+COPY package.json ./
 RUN npm install
 
-# 复制应用文件，包括 entrypoint 脚本
-COPY entrypoint.sh /usr/local/bin/
-COPY unified-server.js dark-browser.js ./
-COPY auth/ ./auth/
-COPY camoufox-linux/ ./camoufox-linux/
+# 6. [来自Dockerfile(B)] 下载并准备 Camoufox
+# 只有 CAMOUFOX_URL 变化时，才会重新下载
+ARG CAMOUFOX_URL
+RUN curl -sSL ${CAMOUFOX_URL} -o camoufox-linux.tar.gz && \
+    tar -xzf camoufox-linux.tar.gz && \
+    rm camoufox-linux.tar.gz && \
+    chmod +x /app/camoufox-linux/camoufox
 
-# 仅设置可执行权限，所有权将在 entrypoint 脚本中动态修复
-RUN chmod +x /usr/local/bin/entrypoint.sh && \
-    chmod +x /home/user/camoufox-linux/camoufox
+# 7. [来自Dockerfile(B)的优化] 最后才拷贝经常变动的应用代码
+# 注意：我们只拷贝需要的文件，而不是用 "COPY . ."
+COPY unified-server.js ./
+COPY dark-browser.js ./
 
-# 暴露端口作为镜像的元数据，这是一个最佳实践
+# 8. [来自您的Dockerfile] 创建一个低权限用户，供 entrypoint.sh 使用
+# 'gosu' 将在容器启动时处理权限切换
+RUN adduser --disabled-password --gecos "" user
+
+# 9. 暴露您在 docker-compose.yml 中定义的端口
 EXPOSE 8889
 
-# 设置 Entrypoint，容器启动时会首先执行这个脚本
+# 10. 定义入口点，执行权限管理脚本
 ENTRYPOINT ["entrypoint.sh"]
 
-# 定义默认命令，它会作为参数传递给 Entrypoint
+# 11. 定义容器默认执行的命令
 CMD ["node", "unified-server.js"]

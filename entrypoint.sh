@@ -30,8 +30,9 @@ fi
 # 修复挂载卷的权限，确保 'user' 用户可以写入
 # chown 会将目录的所有权递归地赋予我们刚刚修正过ID的 'user'
 echo "正在修复挂载目录的所有权..."
-chown -R user:user /home/user/auth
-chown -R user:user /home/user/debug-screenshots
+# 确保目录存在再执行 chown，这样更健壮
+[ -d /app/auth ] && chown -R user:user /app/auth
+[ -d /app/debug-screenshots ] && chown -R user:user /app/debug-screenshots
 echo "权限修复完成。"
 
 # 最后，以 'user' 用户的身份执行传递给脚本的命令（即 CMD）
