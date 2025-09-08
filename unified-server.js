@@ -353,25 +353,52 @@ class BrowserManager {
       }
       this.logger.info('[浏览器] 15秒的持续清理阶段结束。');
 
-      // 第三步：最终的调试与核心操作
-      this.logger.info('[调试] 所有清理和等待已完成，记录最终页面状态...');
-      const finalSnapshotPath = path.join(debugFolder, `FINAL_STATE_before_click.png`);
-      await this.page.screenshot({ path: finalSnapshotPath, fullPage: true });
-      this.logger.info(`[调试] 最终状态快照已保存: ${finalSnapshotPath}`);
+      // 第三步：截图并调试
+      this.logger.info('[调试] 所有清理和等待已完成，记录点击前的最终页面状态...');
+      // 为截图文件名添加时间戳，防止文件被覆盖
+      const beforeClickPath = path.join(debugFolder, `FINAL_STATE_before_click_${Date.now()}.png`);
+      await this.page.screenshot({ path: beforeClickPath, fullPage: true });
+      this.logger.info(`[调试] 点击前的截图已保存: ${beforeClickPath}`);
       
       const allButtons = await this.page.locator('button').allTextContents();
-      this.logger.info(`[调试] 最终页面按钮列表: ${JSON.stringify(allButtons, null, 2)}`);
+      this.logger.info(`[调试] 点击前页面的按钮列表: ${JSON.stringify(allButtons, null, 2)}`);
 
-      // 第四步：执行最终的、带有“双保险”的核心点击
+      // ======================================================
+      // 【V12 - 带前后截图的智能判断】
+      // ======================================================
+      // 第四步：智能判断编辑器状态，在需要时点击 "Code" 按钮，并记录前后状态
       try {
+        const editorLocator = this.page.locator('div.monaco-editor').first();
         const codeButton = this.page.getByRole('button', { name: 'Code' });
-        // 双保险：先等待按钮出现，再用 force 点击
-        await codeButton.waitFor({ timeout: 10000 });
-        await codeButton.click({ force: true });
-        this.logger.info('[浏览器] 已成功强制点击 "Code" 按钮。');
+
+        const isEditorVisible = await editorLocator.isVisible({ timeout: 5000 }).catch(() => false);
+
+        if (isEditorVisible) {
+          this.logger.info('[浏览器] 编辑器已默认可见，跳过点击 "Code" 按钮。');
+        } else {
+          this.logger.info('[浏览器] 编辑器不可见，正在点击 "Code" 按钮以显示它...');
+          await codeButton.waitFor({ timeout: 10000 });
+          await codeButton.click({ force: true });
+          
+          // ======================================================
+          //  新增：截取点击 "Code" 按钮【之后】的屏幕
+          // ======================================================
+          this.logger.info('[调试] 已点击 "Code" 按钮，正在截取点击后的页面状态...');
+          const afterClickPath = path.join(debugFolder, `AFTER_clicking_code_button_${Date.now()}.png`);
+          await this.page.screenshot({ path: afterClickPath, fullPage: true });
+          this.logger.info(`[调试] 点击后的截图已保存: ${afterClickPath}`);
+
+          // 点击后，等待编辑器真正变为可见状态
+          await editorLocator.waitFor({ state: 'visible', timeout: 15000 });
+          this.logger.info('[浏览器] 点击 "Code" 后，编辑器已成功加载并显示。');
+        }
       } catch (err) {
-        this.logger.error('[浏览器] 在所有清理和等待后，点击 "Code" 按钮依然失败，这是致命错误。', err);
-        throw err;
+          this.logger.error('[浏览器] 在判断或切换至Code视图过程中遭遇致命错误。', err);
+          // 在错误发生时也进行截图，用于最终诊断
+          const failurePath = path.join(debugFolder, `FAILURE_at_code_click_logic_${Date.now()}.png`);
+          await this.page.screenshot({ path: failurePath, fullPage: true }).catch(e => this.logger.error(`[调试] 截取失败截图时出错: ${e.message}`));
+          this.logger.info(`[调试] 失败时的截图已保存: ${failurePath}`);
+          throw err;
       }
       
       // 后续的注入脚本逻辑
@@ -381,12 +408,20 @@ class BrowserManager {
       await editorContainerLocator.waitFor({ state: 'attached', timeout: 120000 });
       this.logger.info('[浏览器] 编辑器已附加。');
 
-      this.logger.info('[浏览器] 等待编辑器变为可见，最长120秒...');
-      await editorContainerLocator.waitFor({ state: 'visible', timeout: 120000 });
-      this.logger.info('[浏览器] 编辑器已可见，准备注入脚本。');
+      this.logger.info('[浏览器] 等待5秒，之后将在页面下方执行一次模拟点击以确保页面激活...');
+      await this.page.waitForTimeout(5000);
 
-      // 修正：在注入前，执行一次安全的点击以确保焦点
-      await editorContainerLocator.click({ timeout: 10000 });
+      const viewport = this.page.viewportSize();
+      if (viewport) {
+        const clickX = viewport.width / 2;
+        const clickY = viewport.height - 120;
+        this.logger.info(`[浏览器] 在页面底部中心位置 (x≈${Math.round(clickX)}, y=${clickY}) 执行点击。`);
+        await this.page.mouse.click(clickX, clickY);
+      } else {
+        this.logger.warn('[浏览器] 无法获取视窗大小，跳过页面底部模拟点击。');
+      }
+
+      await editorContainerLocator.click({ force: true, timeout: 120000 });
       await this.page.evaluate(text => navigator.clipboard.writeText(text), buildScriptContent);
       const isMac = os.platform() === 'darwin';
       const pasteKey = isMac ? 'Meta+V' : 'Control+V';
