@@ -25,11 +25,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Download and extract camoufox dependency
-        run: |
-          wget https://github.com/daijro/camoufox/releases/download/v135.0.1-beta.24/camoufox-135.0.1-beta.24-lin.x86_64.zip
-          unzip camoufox-135.0.1-beta.24-lin.x86_64.zip -d camoufox-linux
-       
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -56,6 +51,8 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
+          build-args: |
+            CAMOUFOX_URL=${{ secrets.CAMOUFOX_URL }}
           provenance: false
           sbom: false
           push: true
