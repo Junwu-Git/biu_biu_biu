@@ -51,8 +51,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          build-args: |
-            CAMOUFOX_URL=${{ secrets.CAMOUFOX_URL }}
+          build-args: CAMOUFOX_URL=${{ secrets.CAMOUFOX_URL }}
           provenance: false
           sbom: false
           push: true
