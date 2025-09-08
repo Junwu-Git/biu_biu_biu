@@ -28,9 +28,8 @@ RUN npm install
 
 # 6. [来自Dockerfile(B)] 下载并准备 Camoufox
 # 只有 CAMOUFOX_URL 变化时，才会重新下载
-ARG CAMOUFOX_URL
-RUN curl -sSL ${CAMOUFOX_URL} -o camoufox-linux.tar.gz && \
-    tar -xzf camoufox-linux.tar.gz && \
+COPY camoufox-linux.tar.gz .
+RUN tar -xzf camoufox-linux.tar.gz && \
     rm camoufox-linux.tar.gz && \
     chmod +x /app/camoufox-linux/camoufox
 
