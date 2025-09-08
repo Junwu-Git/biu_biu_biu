@@ -1235,266 +1235,307 @@ class ProxyServerSystem extends EventEmitter {
     return app;
   }
 
-  // A、B版本聚合的最终仪表盘
-  _getDashboardHtml() {
-    return `
+_getDashboardHtml() {
+  return `
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>服务器仪表盘 (聚合版)</title>
-    <style>
-        :root { --pico-background-color: #11191f; --pico-color: #dce3e9; --pico-card-background-color: #1a242c; --pico-card-border-color: #2b3a47; --pico-primary: #3d8bfd; --pico-primary-hover: #529bff; --pico-form-element-background-color: #1a242c; --pico-form-element-border-color: #2b3a47; --pico-h1-color: #fff; --pico-muted-color: #7a8c99; --pico-border-radius: 0.5rem; --info-color: #17a2b8; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 2rem; background-color: var(--pico-background-color); color: var(--pico-color); }
-        main.container { max-width: 1200px; margin: 0 auto; padding-top: 30px; display: none; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem; }
-        article { border: 1px solid var(--pico-card-border-color); border-radius: var(--pico-border-radius); padding: 1.5rem; background: var(--pico-card-background-color); }
-        h1, h2 { margin-top: 0; color: var(--pico-h1-color); border-bottom: 1px solid var(--pico-card-border-color); padding-bottom: 0.5rem; margin-bottom: 1rem; }
-        .status-grid { display: grid; grid-template-columns: auto 1fr; gap: 0.5rem 1rem; align-items: center;}
-        .status-grid strong { color: var(--pico-color); } .status-grid span { color: var(--pico-muted-color); text-align: right; }
-        .status-text-info { color: var(--info-color); font-weight: bold; } .status-text-red { color: #dc3545; font-weight: bold; } .status-text-yellow { color: #ffc107; font-weight: bold; } .status-text-gray { color: var(--pico-muted-color); font-weight: bold; }
-        .tag { display: inline-block; padding: 0.25em 0.6em; font-size: 0.75em; font-weight: 700; border-radius: 0.35rem; color: #fff; }
-        .tag-info { background-color: #17a2b8; } .tag-blue { background-color: #007bff; } .tag-yellow { color: #212529; background-color: #ffc107; }
-        .scrollable-list { max-height: 220px; overflow-y: auto; border: 1px solid var(--pico-form-element-border-color); border-radius: 0.25rem; padding: 0.5rem;}
-        .account-list li { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; border-radius: 0.25rem; }
-        .account-list li:nth-child(odd) { background-color: rgba(255,255,255,0.03); }
-        .account-list .current { font-weight: bold; color: var(--pico-primary); }
-        details summary { cursor: pointer; display: flex; justify-content: space-between; align-items: center; list-style: none; }
-        .model-stats-list { padding: 0.5rem 0 0.5rem 1.5rem; font-size: 0.9em; background-color: rgba(0,0,0,0.1); }
-        button, input, textarea, select { background-color: var(--pico-form-element-background-color); border: 1px solid var(--pico-form-element-border-color); color: var(--pico-color); padding: 0.5rem 1rem; border-radius: var(--pico-border-radius); font-family: inherit; font-size: inherit; }
-        button { cursor: pointer; background-color: var(--pico-primary); border-color: var(--pico-primary); color: #fff; }
-        .btn-danger { background-color: #dc3545; border-color: #dc3545; } .btn-sm { font-size: 0.8em; padding: 0.2rem 0.5rem; }
-        .top-banner { position: fixed; top: 0; right: 0; background-color: #ffc107; color: #212529; padding: 5px 15px; font-size: 0.9em; z-index: 1001; border-bottom-left-radius: 0.5rem; }
-        .toast { position: fixed; bottom: 20px; right: 20px; background-color: var(--pico-primary); color: white; padding: 15px; border-radius: 5px; z-index: 1000; opacity: 0; transition: opacity 0.5s; }
-        .toast.show { opacity: 1; } .toast.error { background-color: #dc3545; }
-        form label { display: block; margin-bottom: 0.5rem; } form input { width: 100%; box-sizing: border-box; } .form-group { margin-bottom: 1rem; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>服务器仪表盘 (gcli2api Style)</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+:root {
+  --bg-color: #111217;
+  --card-bg-color: #1f2937;
+  --border-color: rgba(139,92,246,0.2);
+  --text-color: #f9fafb;
+  --text-muted-color: #9ca3af;
+  --primary-color: #6d28d9;
+  --primary-glow-color: rgba(109,40,217,0.5);
+  --primary-hover-color: #7c3aed;
+  --success-color: #16a34a;
+  --danger-color: #dc2626;
+  --border-radius: 0.75rem;
+  --transition-speed: 0.25s;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: 'Inter', sans-serif;
+  margin: 0; padding: 3rem;
+  background: linear-gradient(135deg,#111217,#1a1b23);
+  color: var(--text-color);
+  min-height: 100vh;
+}
+main.container {
+  max-width: 1200px; margin: 0 auto;
+  display: none; opacity: 0;
+  transform: translateY(20px);
+  transition: opacity var(--transition-speed) ease-out, transform var(--transition-speed) ease-out;
+}
+main.container.visible { display: block; opacity: 1; transform: translateY(0); }
+.main-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px,1fr));
+  grid-auto-rows: minmax(300px, auto);
+  gap: 2rem;
+}
+
+/* 卡片效果 */
+article {
+  background: var(--card-bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 2rem;
+  box-shadow: 0 0 15px rgba(0,0,0,0.2);
+  transition: transform var(--transition-speed), box-shadow var(--transition-speed), border-color var(--transition-speed);
+}
+article:hover {
+  transform: translateY(-6px) scale(1.02);
+  box-shadow: 0 0 30px var(--primary-glow-color);
+  border-color: var(--primary-color);
+}
+
+/* 标题与文字 */
+h1 { display:flex; align-items:center; gap:1rem; font-size:2.25rem; font-weight:700; margin-bottom:2.5rem; text-shadow:0 0 10px var(--primary-glow-color);}
+h2 { display:flex; align-items:center; gap:0.75rem; margin-top:0; padding-bottom:1rem; margin-bottom:1.5rem; font-size:1.25rem; font-weight:600; border-bottom:1px solid var(--border-color);}
+h2 .icon { color: var(--primary-color); }
+
+.status-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+.status-item { background-color: rgba(255,255,255,0.03); padding:1rem; border-radius:0.5rem; border:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; transition: background 0.3s, transform 0.3s; }
+.status-item span { font-weight:600; transition: color 0.3s; }
+.status-text-info { color:#60a5fa; }
+.status-text-red { color:#f87171; }
+.status-text-yellow { color:#facc15; }
+
+/* 表单和按钮 */
+button,input,select {
+  background-color: transparent; border: 1px solid var(--border-color);
+  color: var(--text-color); padding:0.75rem 1rem;
+  border-radius:0.5rem; font-family: inherit; font-size:1rem;
+  transition: all var(--transition-speed);
+  width:100%;
+}
+input:focus, select:focus { outline:none; border-color: var(--primary-color); box-shadow:0 0 0 3px var(--primary-glow-color); }
+button { cursor:pointer; font-weight:600; background-color: var(--primary-color); border:none; color: var(--text-color); box-shadow:0 0 15px var(--primary-glow-color);}
+button:hover { background-color: var(--primary-hover-color); transform: scale(1.05); }
+.btn-success { background-color: var(--success-color); box-shadow: 0 0 15px rgba(22,163,74,0.5);}
+.btn-success:hover { background-color:#22c55e; }
+.btn-danger { background-color: var(--danger-color); border:none; color:#fff; box-shadow:none; font-size:0.8rem; padding:0.4rem 0.8rem; font-weight:500;}
+.btn-danger:hover { background-color:#ef4444; transform: scale(1.05); }
+
+.form-group { margin-bottom:1.5rem; }
+form label { display:block; margin-bottom:0.5rem; font-weight:500; color: var(--text-muted-color); }
+
+.account-list { list-style:none; padding:0; margin:0; display:grid; gap:0.75rem; }
+.account-list li {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:0.75rem 1rem;
+  background-color: rgba(255,255,255,0.03);
+  border:1px solid var(--border-color); border-radius:0.5rem;
+  transition: all var(--transition-speed);
+}
+.account-list li:hover { border-color: var(--primary-color); background-color: rgba(109,40,217,0.1);}
+.account-list li.current { border-color: var(--primary-color); box-shadow: inset 0 0 10px var(--primary-glow-color); font-weight:600; }
+
+.tag { padding:0.25em 0.75em; font-size:0.8em; font-weight:500; border-radius:999px; border:1px solid; }
+.tag-permanent { color:#60a5fa; border-color:#60a5fa; }
+.tag-temporary { color:#facc15; border-color:#facc15; }
+
+/* toast 动画 */
+.toast { position: fixed; bottom: 20px; right: 20px; background-color:#282a36; color:white; padding:1rem 1.5rem; border-radius:var(--border-radius); border-left:4px solid var(--primary-color); z-index:1000; opacity:0; transform: translateY(20px) scale(0.95); transition: all 0.4s cubic-bezier(0.215,0.610,0.355,1); box-shadow:0 10px 30px rgba(0,0,0,0.3);}
+.toast.show { opacity:1; transform:translateY(0) scale(1); }
+.toast.error { border-left-color: var(--danger-color);}
+.toast.success { border-left-color: var(--success-color);}
+</style>
 </head>
-<body data-theme="dark">
-    <div class="top-banner">注意: 此面板中添加的账号和修改的变量均是临时的，重启后会丢失</div>
-    <main class="container">
-        <h1>🐢 服务器仪表盘 (聚合版)</h1>
-        <div class="grid">
-            <article>
-                <h2>服务器状态</h2>
-                <div class="status-grid">
-                    <strong>运行时间:</strong> <span id="uptime">--</span>
-                    <strong>浏览器:</strong> <span id="browserConnected">--</span>
-                    <strong>认证模式:</strong> <span id="authMode">--</span>
-                    <strong>API密钥认证:</strong> <span id="apiKeyAuth">--</span>
-                    <strong>调试模式:</strong> <span id="debugMode">--</span>
-                    <strong>API总调用次数:</strong> <span id="totalCalls">0</span>
-                </div>
-            </article>
-            <article>
-                <h2>调用统计</h2>
-                <div id="accountCalls" class="scrollable-list"></div>
-            </article>
-            <article>
-                <h2>账号管理</h2>
-                <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
-                    <button id="switchAccountBtn">切换到下一个账号</button>
-                    <button id="addAccountBtn">添加临时账号</button>
-                </div>
-                <h3>账号池</h3>
-                <div id="accountPool" class="scrollable-list"></div>
-            </article>
-            <article>
-                <h2>实时配置</h2>
-                <form id="configForm">
-                    <div class="form-group">
-                        <label for="configStreamingMode">流式模式</label>
-                        <select id="configStreamingMode" name="streamingMode">
-                            <option value="real">Real</option>
-                            <option value="fake">Fake</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="configSwitchOnUses">几次生成请求后轮换 (0为禁用)</label>
-                        <input type="number" id="configSwitchOnUses" name="switchOnUses">
-                    </div>
-                    <div class="form-group">
-                        <label for="configFailureThreshold">几次失败后切换账号 (0为禁用)</label>
-                        <input type="number" id="configFailureThreshold" name="failureThreshold">
-                    </div>
-                    <div class="form-group">
-                        <label for="configMaxRetries">单次请求内部重试次数</label>
-                        <input type="number" id="configMaxRetries" name="maxRetries">
-                    </div>
-                    <div class="form-group">
-                        <label for="configRetryDelay">重试间隔(毫秒)</label>
-                        <input type="number" id="configRetryDelay" name="retryDelay">
-                    </div>
-                    <div class="form-group">
-                        <label for="configImmediateSwitchStatusCodes">立即切换的状态码 (逗号分隔)</label>
-                        <input type="text" id="configImmediateSwitchStatusCodes" name="immediateSwitchStatusCodes">
-                    </div>
-                    <button type="submit">应用临时更改</button>
-                </form>
-            </article>
-        </div>
-    </main>
-    <div id="toast" class="toast"></div>
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const API_KEY_SESSION_STORAGE = 'dashboard_api_key';
-            const API_BASE = '/dashboard';
-            const mainContainer = document.querySelector('main.container');
-            
-            function getAuthHeaders(hasBody = false) {
-                const headers = { 'X-Dashboard-Auth': sessionStorage.getItem(API_KEY_SESSION_STORAGE) || '' };
-                if (hasBody) { headers['Content-Type'] = 'application/json'; }
-                return headers;
-            }
+<body>
+<main class="container">
+<h1>
+  <svg class="icon" width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M16.42 7.45L12 2L7.58 7.45L12 12.87L16.42 7.45ZM17.97 14.39L12 22L6.03 14.39L12 8.42L17.97 14.39Z" stroke="var(--primary-color)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <span>服务器仪表盘</span>
+</h1>
 
-            function showToast(message, isError = false) {
-                const toastEl = document.getElementById('toast');
-                toastEl.textContent = message;
-                toastEl.className = isError ? 'toast show error' : 'toast show';
-                setTimeout(() => { toastEl.className = 'toast'; }, 3000);
-            }
+<div class="main-grid">
+  <article>
+    <h2><span class="icon">🕹️</span> 账号管理</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem;">
+      <button id="switchAccountBtn">切换下一个账号</button>
+      <button id="addAccountBtn">添加临时账号</button>
+    </div>
+    <div id="accountPool" class="account-list"></div>
+  </article>
 
-            function formatUptime(seconds) {
-                const d = Math.floor(seconds / (3600*24)); const h = Math.floor(seconds % (3600*24) / 3600);
-                const m = Math.floor(seconds % 3600 / 60); const s = Math.floor(seconds % 60);
-                return \`\${d}天 \${h}小时 \${m}分钟 \${s}秒\`;
-            }
+  <article>
+    <h2><span class="icon">📊🖥️</span> 调用统计 & 服务器状态</h2>
+    <div id="accountStats" class="account-list" style="margin-bottom:1.5rem;"></div>
+    <div class="status-grid">
+      <div class="status-item"><strong>运行时间</strong> <span id="uptime">--</span></div>
+      <div class="status-item"><strong>浏览器</strong> <span id="browserConnected">--</span></div>
+      <div class="status-item"><strong>认证模式</strong> <span id="authMode">--</span></div>
+      <div class="status-item"><strong>API密钥认证</strong> <span id="apiKeyAuth">--</span></div>
+      <div class="status-item"><strong>调试模式</strong> <span id="debugMode">--</span></div>
+      <div class="status-item"><strong>API总调用次数</strong> <span id="totalCalls">--</span></div>
+    </div>
+  </article>
 
-            async function fetchData() {
-                try {
-                    const response = await fetch(\`\${API_BASE}/data\`, { headers: getAuthHeaders() });
-                    if (response.status === 401) {
-                         mainContainer.style.display = 'none';
-                         document.body.insertAdjacentHTML('afterbegin', '<h1>认证已过期或无效，请刷新页面重新输入密钥。</h1>');
-                         return;
-                    }
-                    if (!response.ok) throw new Error('获取数据失败');
-                    const data = await response.json();
-                    
-                    document.getElementById('uptime').textContent = formatUptime(data.status.uptime);
-                    document.getElementById('browserConnected').innerHTML = data.status.browserConnected ? '<span class="status-text-info">已连接</span>' : '<span class="status-text-red">已断开</span>';
-                    document.getElementById('authMode').innerHTML = data.status.authMode === 'env' ? '<span class="status-text-info">环境变量</span>' : '<span class="status-text-info">Cookie文件</span>';
-                    document.getElementById('apiKeyAuth').innerHTML = data.status.apiKeyAuth === '已启用' ? '<span class="status-text-info">已启用</span>' : '<span class="status-text-gray">已禁用</span>';
-                    document.getElementById('debugMode').innerHTML = data.status.debugMode ? '<span class="status-text-yellow">已启用</span>' : '<span class="status-text-gray">已禁用</span>';
-                    document.getElementById('totalCalls').textContent = data.stats.totalCalls;
-                    
-                    const accountCallsEl = document.getElementById('accountCalls');
-                    accountCallsEl.innerHTML = '';
-                    const sortedAccounts = Object.entries(data.stats.accountCalls).sort((a,b) => parseInt(a[0]) - parseInt(b[0]));
-                    const callsUl = document.createElement('ul');
-                    callsUl.className = 'account-list';
-                    for (const [index, stats] of sortedAccounts) {
-                        const li = document.createElement('li');
-                        const isCurrent = parseInt(index, 10) === data.auth.currentAuthIndex;
-                        let modelStatsHtml = '<ul class="model-stats-list">';
-                        Object.entries(stats.models).sort((a,b) => b[1] - a[1]).forEach(([model, count]) => { modelStatsHtml += \`<li><span>\${model}:</span> <strong>\${count}</strong></li>\`; });
-                        modelStatsHtml += '</ul>';
-                        li.innerHTML = \`<details><summary><span class="\${isCurrent ? 'current' : ''}">账号 \${index}</span><strong>总计: \${stats.total}</strong></summary>\${modelStatsHtml}</details>\`;
-                        if(isCurrent) { li.querySelector('summary').style.color = 'var(--pico-primary)'; }
-                        callsUl.appendChild(li);
-                    }
-                    accountCallsEl.appendChild(callsUl);
+  <article style="grid-column: 1 / -1;">
+    <h2><span class="icon">⚙️</span> 实时配置</h2>
+    <form id="configForm">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
+        <div class="form-group"><label for="configStreamingMode">流式模式</label><select id="configStreamingMode" name="streamingMode"><option value="real">Real</option><option value="fake">Fake</option></select></div>
+        <div class="form-group"><label for="configSwitchOnUses">N次请求后轮换</label><input type="number" id="configSwitchOnUses" name="switchOnUses"></div>
+        <div class="form-group"><label for="configFailureThreshold">N次失败后切换</label><input type="number" id="configFailureThreshold" name="failureThreshold"></div>
+        <div class="form-group"><label for="configMaxRetries">内部重试次数</label><input type="number" id="configMaxRetries" name="maxRetries"></div>
+        <div class="form-group"><label for="configRetryDelay">重试间隔(ms)</label><input type="number" id="configRetryDelay" name="retryDelay"></div>
+      </div>
+      <div class="form-group"><label for="configImmediateSwitchStatusCodes">立即切换的状态码 (逗号分隔)</label><input type="text" id="configImmediateSwitchStatusCodes" name="immediateSwitchStatusCodes"></div>
+      <button type="submit" class="btn-success">应用临时更改</button>
+    </form>
+  </article>
+</div>
+</main>
 
-                    const accountPoolEl = document.getElementById('accountPool');
-                    accountPoolEl.innerHTML = '';
-                    const poolUl = document.createElement('ul');
-                    poolUl.className = 'account-list';
-                    data.auth.accounts.forEach(acc => {
-                        const li = document.createElement('li');
-                        const isCurrent = acc.index === data.auth.currentAuthIndex;
-                        const sourceTag = acc.source === 'temporary' ? '<span class="tag tag-yellow">临时</span>' : (acc.source === 'env' ? '<span class="tag tag-info">变量</span>' : '<span class="tag tag-blue">文件</span>');
-                        let html = \`<span class="\${isCurrent ? 'current' : ''}">账号 \${acc.index} \${sourceTag}</span>\`;
-                        if (acc.source === 'temporary') { html += \`<button class="btn-danger btn-sm" data-index="\${acc.index}">删除</button>\`; }
-                        li.innerHTML = html;
-                        poolUl.appendChild(li);
-                    });
-                    accountPoolEl.appendChild(poolUl);
+<div id="toast" class="toast"></div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const API_KEY_SESSION_STORAGE = 'dashboard_api_key';
+  const API_BASE = '/dashboard';
+  const mainContainer = document.querySelector('main.container');
 
-                    const configForm = document.getElementById('configForm');
-                    configForm.streamingMode.value = data.config.streamingMode;
-                    configForm.switchOnUses.value = data.config.switchOnUses;
-                    configForm.failureThreshold.value = data.config.failureThreshold;
-                    configForm.maxRetries.value = data.config.maxRetries;
-                    configForm.retryDelay.value = data.config.retryDelay;
-                    configForm.immediateSwitchStatusCodes.value = (data.config.immediateSwitchStatusCodes || []).join(', ');
-                } catch (error) { console.error('获取数据时出错:', error); }
-            }
-
-            function initializeDashboardListeners() {
-                document.getElementById('switchAccountBtn').addEventListener('click', async () => {
-                    try {
-                        const response = await fetch('/switch', { method: 'POST', headers: getAuthHeaders() });
-                        const text = await response.text();
-                        if (!response.ok) throw new Error(text);
-                        showToast(text); fetchData();
-                    } catch (error) { showToast(error.message, true); }
-                });
-
-                document.getElementById('addAccountBtn').addEventListener('click', () => {
-                    const index = prompt("输入新临时账号的数字索引：");
-                    if (!index || isNaN(parseInt(index))) return;
-                    const authDataStr = prompt("输入单行压缩后的Cookie内容:");
-                    if (!authDataStr) return;
-                    let authData; try { authData = JSON.parse(authDataStr); } catch(e) { alert("Cookie JSON格式无效。"); return; }
-                    fetch(\`\${API_BASE}/accounts\`, { method: 'POST', headers: getAuthHeaders(true), body: JSON.stringify({ index: parseInt(index), authData }) })
-                        .then(res => res.json().then(data => { if (!res.ok) throw new Error(data.message || '操作失败'); return data; }))
-                        .then(data => { showToast(data.message); fetchData(); }).catch(err => showToast(err.message, true));
-                });
-
-                document.getElementById('accountPool').addEventListener('click', e => {
-                    if (e.target.matches('button.btn-danger')) {
-                        const index = e.target.dataset.index;
-                        if (confirm(\`确定删除临时账号 \${index} 吗？\`)) {
-                            fetch(\`\${API_BASE}/accounts/\${index}\`, { method: 'DELETE', headers: getAuthHeaders() })
-                                .then(res => res.json().then(data => { if (!res.ok) throw new Error(data.message || '操作失败'); return data; }))
-                                .then(data => { showToast(data.message); fetchData(); }).catch(err => showToast(err.message, true));
-                        }
-                    }
-                });
-
-                document.getElementById('configForm').addEventListener('submit', e => {
-                    e.preventDefault();
-                    const formData = new FormData(e.target);
-                    const data = Object.fromEntries(formData.entries());
-                    data.immediateSwitchStatusCodes = data.immediateSwitchStatusCodes.split(',').map(s => s.trim()).filter(Boolean);
-                     fetch(\`\${API_BASE}/config\`, { method: 'POST', headers: getAuthHeaders(true), body: JSON.stringify(data) })
-                        .then(res => res.json().then(data => { if (!res.ok) throw new Error(data.message || '操作失败'); return data; }))
-                        .then(() => { showToast('配置已应用。'); fetchData(); }).catch(err => showToast(err.message, true));
-                });
-            }
-
-            async function verifyAndLoad() {
-                try {
-                    const key = sessionStorage.getItem(API_KEY_SESSION_STORAGE) || prompt("请输入API密钥以访问仪表盘:");
-                    if (key === null) { // User clicked cancel
-                         document.body.innerHTML = '<h1>访问被拒绝</h1>';
-                         return;
-                    }
-                    
-                    const response = await fetch(\`\${API_BASE}/verify-key\`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key }) });
-                    const result = await response.json();
-
-                    if (response.ok && result.success) {
-                        sessionStorage.setItem(API_KEY_SESSION_STORAGE, key);
-                        mainContainer.style.display = 'block';
-                        initializeDashboardListeners();
-                        fetchData(); 
-                        setInterval(fetchData, 5000);
-                    } else {
-                        document.body.innerHTML = \`<h1>认证失败: \${result.message || '无效的API密钥'}</h1>\`;
-                    }
-                } catch (err) { 
-                    document.body.innerHTML = \`<h1>认证时发生错误: \${err.message}</h1>\`; 
-                }
-            }
-
-            verifyAndLoad();
-        });
-    </script>
-</body>
-</html>`;
+  function getAuthHeaders(hasBody = false) {
+    const headers = { 'X-Dashboard-Auth': sessionStorage.getItem(API_KEY_SESSION_STORAGE) || '' };
+    if (hasBody) headers['Content-Type'] = 'application/json';
+    return headers;
   }
+
+  function showToast(message, type = 'info') {
+    const toastEl = document.getElementById('toast');
+    toastEl.textContent = message;
+    toastEl.className = 'toast show ' + type;
+    setTimeout(() => { toastEl.className = 'toast'; }, 3000);
+  }
+
+  function formatUptime(seconds) {
+    const d = Math.floor(seconds / (3600*24));
+    const h = Math.floor(seconds % (3600*24) / 3600);
+    const m = Math.floor(seconds % 3600 / 60);
+    const s = Math.floor(seconds % 60);
+    return (d ? d+'天 ' : '') + (h || d ? h+'小时 ' : '') + (m || h || d ? m+'分钟 ' : '') + s+'秒';
+  }
+
+  async function fetchData() {
+    try {
+      const response = await fetch(API_BASE + '/data', { headers: getAuthHeaders() });
+      if (!response.ok) { sessionStorage.removeItem(API_KEY_SESSION_STORAGE); mainContainer.classList.remove('visible'); document.body.innerHTML = '<h1>认证已过期或无效，请刷新页面重新输入密钥。</h1>'; return; }
+      const data = await response.json();
+
+      document.getElementById('uptime').textContent = formatUptime(data.status.uptime);
+      document.getElementById('browserConnected').innerHTML = data.status.browserConnected ? '<span class="status-text-info">已连接</span>' : '<span class="status-text-red">已断开</span>';
+      document.getElementById('authMode').innerHTML = data.status.authMode === 'env' ? '环境变量' : '文件';
+      document.getElementById('apiKeyAuth').innerHTML = data.status.apiKeyAuth === '已启用' ? '<span class="status-text-info">已启用</span>' : '已禁用';
+      document.getElementById('debugMode').innerHTML = data.status.debugMode ? '<span class="status-text-yellow">已启用</span>' : '已禁用';
+      document.getElementById('totalCalls').textContent = data.stats.totalCalls;
+
+      const accountStatsEl = document.getElementById('accountStats'); accountStatsEl.innerHTML = '';
+      const sortedAccountsStat = Object.entries(data.stats.accountCalls).sort((a,b) => parseInt(a[0])-parseInt(b[0]));
+      if (!sortedAccountsStat.length) accountStatsEl.innerHTML = '<li>无调用记录</li>';
+      else sortedAccountsStat.forEach(([index, stats]) => { const li = document.createElement('li'); li.innerHTML = '<span>账号 '+index+'</span><strong>'+stats.total+' 次</strong>'; if(parseInt(index)===data.auth.currentAuthIndex) li.classList.add('current'); accountStatsEl.appendChild(li); });
+
+      const accountPoolEl = document.getElementById('accountPool'); accountPoolEl.innerHTML = '';
+      if (!data.auth.accounts.length) accountPoolEl.innerHTML = '<li>账号池为空</li>';
+      else data.auth.accounts.forEach(acc => {
+        const li = document.createElement('li');
+        const sourceTag = acc.source==='temporary'?'<span class="tag tag-temporary">临时</span>':'<span class="tag tag-permanent">永久</span>';
+        let html = '<div style="display:flex;align-items:center;gap:0.75rem;"><span>账号 '+acc.index+'</span> '+sourceTag+'</div>';
+        if (acc.source==='temporary') html += '<button class="btn-danger" data-index="'+acc.index+'">删除</button>';
+        li.innerHTML = html;
+        if (acc.index===data.auth.currentAuthIndex) li.classList.add('current');
+        accountPoolEl.appendChild(li);
+      });
+
+      const configForm = document.getElementById('configForm');
+      configForm.streamingMode.value = data.config.streamingMode;
+      configForm.switchOnUses.value = data.config.switchOnUses;
+      configForm.failureThreshold.value = data.config.failureThreshold;
+      configForm.maxRetries.value = data.config.maxRetries;
+      configForm.retryDelay.value = data.config.retryDelay;
+      configForm.immediateSwitchStatusCodes.value = (data.config.immediateSwitchStatusCodes || []).join(', ');
+    } catch (error) { console.error('获取数据时出错:', error); }
+  }
+
+  function initializeListeners() {
+    document.getElementById('switchAccountBtn').addEventListener('click', async () => {
+      showToast('正在切换账号...', 'info');
+      try { const response = await fetch('/switch', { method: 'POST', headers: getAuthHeaders() }); const text = await response.text(); if (!response.ok) throw new Error(text); showToast(text, 'success'); fetchData(); } catch (error) { showToast(error.message,'error'); }
+    });
+
+    document.getElementById('addAccountBtn').addEventListener('click', () => {
+      const index = prompt("输入新临时账号的数字索引："); if (!index || isNaN(parseInt(index))) return;
+      const authDataStr = prompt("输入单行压缩后的Cookie内容:"); if (!authDataStr) return;
+      let authData; try { authData = JSON.parse(authDataStr); } catch(e) { alert("Cookie JSON格式无效。"); return; }
+      fetch(API_BASE+'/account',{method:'POST',headers:getAuthHeaders(true),body:JSON.stringify({index:parseInt(index),authData})})
+      .then(res=>res.json().then(data=>{if(!res.ok) throw new Error(data.message||'操作失败');return data;}))
+      .then(()=>{showToast('临时账号已添加','success');fetchData();})
+      .catch(err=>showToast(err.message,'error'));
+    });
+
+    document.getElementById('accountPool').addEventListener('click', e => {
+      if(e.target.classList.contains('btn-danger')) {
+        const index = e.target.dataset.index;
+        if(!confirm('确定要删除账号 '+index+' 吗？')) return;
+        fetch(API_BASE+'/account/'+index,{method:'DELETE',headers:getAuthHeaders()})
+        .then(res=>res.json().then(data=>{if(!res.ok)throw new Error(data.message||'操作失败');return data;}))
+        .then(()=>{showToast('账号已删除','success');fetchData();})
+        .catch(err=>showToast(err.message,'error'));
+      }
+    });
+
+    document.getElementById('configForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const data = Object.fromEntries(formData.entries());
+      data.switchOnUses=parseInt(data.switchOnUses,10)||0;
+      data.failureThreshold=parseInt(data.failureThreshold,10)||0;
+      data.maxRetries=parseInt(data.maxRetries,10)||0;
+      data.retryDelay=parseInt(data.retryDelay,10)||0;
+      data.immediateSwitchStatusCodes=data.immediateSwitchStatusCodes.split(',').map(s=>s.trim()).filter(Boolean);
+      fetch(API_BASE+'/config',{method:'POST',headers:getAuthHeaders(true),body:JSON.stringify(data)})
+      .then(res=>res.json().then(data=>{if(!res.ok)throw new Error(data.message||'操作失败');return data;}))
+      .then(()=>{showToast('配置已应用','success');fetchData();})
+      .catch(err=>showToast(err.message,'error'));
+    });
+  }
+
+  async function checkApiKey() {
+    const apiKey=sessionStorage.getItem(API_KEY_SESSION_STORAGE);
+    if(!apiKey) {
+      const key=prompt('请输入访问仪表盘的API密钥：');
+      if(!key){document.body.innerHTML='<h1>需要提供API密钥。</h1>'; return;}
+      sessionStorage.setItem(API_KEY_SESSION_STORAGE,key);
+    }
+    try {
+      const response = await fetch(API_BASE+'/data',{headers:getAuthHeaders()});
+      if(!response.ok) throw new Error('认证失败');
+      mainContainer.classList.add('visible');
+      initializeListeners();
+      fetchData();
+      setInterval(fetchData,5000);
+    } catch(error) {
+      sessionStorage.removeItem(API_KEY_SESSION_STORAGE);
+      document.body.innerHTML='<h1>API密钥无效，请刷新页面重新输入。</h1>';
+    }
+  }
+
+  checkApiKey();
+});
+</script>
+</body>
+</html>
+  `;
+}
 
   async _startWebSocketServer() {
     this.wsServer = new WebSocket.Server({ port: this.config.wsPort, host: this.config.host });
