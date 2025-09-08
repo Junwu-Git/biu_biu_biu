@@ -381,20 +381,12 @@ class BrowserManager {
       await editorContainerLocator.waitFor({ state: 'attached', timeout: 120000 });
       this.logger.info('[浏览器] 编辑器已附加。');
 
-      this.logger.info('[浏览器] 等待5秒，之后将在页面下方执行一次模拟点击以确保页面激活...');
-      await this.page.waitForTimeout(5000);
+      this.logger.info('[浏览器] 等待编辑器变为可见，最长120秒...');
+      await editorContainerLocator.waitFor({ state: 'visible', timeout: 120000 });
+      this.logger.info('[浏览器] 编辑器已可见，准备注入脚本。');
 
-      const viewport = this.page.viewportSize();
-      if (viewport) {
-        const clickX = viewport.width / 2;
-        const clickY = viewport.height - 120;
-        this.logger.info(`[浏览器] 在页面底部中心位置 (x≈${Math.round(clickX)}, y=${clickY}) 执行点击。`);
-        await this.page.mouse.click(clickX, clickY);
-      } else {
-        this.logger.warn('[浏览器] 无法获取视窗大小，跳过页面底部模拟点击。');
-      }
-
-      await editorContainerLocator.click({ force: true, timeout: 120000 });
+      // 修正：在注入前，执行一次安全的点击以确保焦点
+      await editorContainerLocator.click({ timeout: 10000 });
       await this.page.evaluate(text => navigator.clipboard.writeText(text), buildScriptContent);
       const isMac = os.platform() === 'darwin';
       const pasteKey = isMac ? 'Meta+V' : 'Control+V';
