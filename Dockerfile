@@ -28,10 +28,8 @@ RUN npm install
 
 # 6. [来自Dockerfile(B)] 下载并准备 Camoufox
 # 只有 CAMOUFOX_URL 变化时，才会重新下载
-COPY camoufox-linux.tar.gz .
-RUN tar -xzf camoufox-linux.tar.gz && \
-    rm camoufox-linux.tar.gz && \
-    chmod +x /app/camoufox-linux/camoufox
+COPY camoufox-linux /app/camoufox-linux
+RUN chmod +x /app/camoufox-linux/camoufox
 
 # 7. [来自Dockerfile(B)的优化] 最后才拷贝经常变动的应用代码
 # 注意：我们只拷贝需要的文件，而不是用 "COPY . ."

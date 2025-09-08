@@ -47,9 +47,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Download Camoufox artifact
-        run: curl -sSL ${{ secrets.CAMOUFOX_URL }} -o camoufox-linux.tar.gz
-
+      - name: Download and extract camoufox dependency
+        run: |
+          wget https://github.com/daijro/camoufox/releases/download/v135.0.1-beta.24/camoufox-135.0.1-beta.24-lin.x86_64.zip
+          unzip camoufox-135.0.1-beta.24-lin.x86_64.zip -d camoufox-linux
+       
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
