@@ -35,30 +35,85 @@
         deploy:
           resources:
             limits:
-              memory: 1024M          
+              memory: 1024M
         volumes:
           - ./auth:/app/auth
           - ./debug-screenshots:/app/debug-screenshots
+        networks:
+          - internal-redis-network # 确保 biu_biu_biu 可以访问到 redis-server
+
+      # Redis 服务
+      redis-server:
+        image: redis:latest 
+        container_name: redis
+        restart: always
+        command: redis-server --appendonly yes # 启用持久化 (可选，但推荐)
+        volumes:
+          - ./data:/data # 数据持久化
+        networks:
+          - internal-redis-network # 连接到内部网络，与 biu_biu_biu 通信
+        # ports: # Redis 通常不需要对外暴露端口，但如果需要，可以取消注释
+        #   - "6379:6379" 
+
+    networks:
+      internal-redis-network: # 内部网络，用于 biu_biu_biu 和 redis-server 通信
+        driver: bridge
+
     ```
 
 3.  🔑 **准备 `.env` 文件**:
     在项目根目录创建 `.env` 文件，并粘贴以下内容。请**务必替换 `API_KEYS`** 为您的实际密钥。
     ```env
-    # User and Group IDs for permission handling.
-    # This is used by entrypoint.sh script to match your host user.
-    # Find these using 'id -u' and 'id -g' on your host.
-    TARGET_UID=YOUR_HOST_UID_HERE # 例如 1001
-    TARGET_GID=YOUR_HOST_GID_HERE # 例如 1001
+    # =================================================================
+    # ===================         核心配置         ===================
+    # =================================================================
 
-    # --- Your Secrets (Required) ---
+    # --- 用户与权限 (Docker) ---
+    # 描述: 用于 Docker 容器内文件权限的映射。
+    # 用法: 在你的主机上运行 `id -u` 和 `id -g` 来获取值。
+    # TARGET_UID=1001
+    # TARGET_GID=1001
+
+    # --- API 密钥 (安全) ---
+    # 描述: 用于保护代理服务的访问密钥，多个密钥用英文逗号分隔。
+    # 示例: API_KEYS=key1,key2,key3
     API_KEYS=your_secret_api_key_here
 
-    # --- Optional Configurations ---
-    FAILURE_THRESHOLD=0
-    MAX_RETRIES=3
-    RETRY_DELAY=3000
-    IMMEDIATE_SWITCH_STATUS_CODES=429,503
-    STREAMING_MODE=fake
+    # --- 服务器监听配置 ---
+    # 描述: 代理服务器监听的端口和主机地址。
+    # PORT=8889
+    # HOST=0.0.0.0
+
+    # =================================================================
+    # ===================         功能配置         ===================
+    # =================================================================
+
+    # --- 调试与流式模式 ---
+    # 描述: 开启或关闭调试模式，以及设置响应模式 ('real' 或 'fake')。
+    # DEBUG_MODE=false
+    # STREAMING_MODE=real
+
+    # --- 账号切换与重试策略 ---
+    # 描述: 配置服务在遇到错误时的行为。
+    # FAILURE_THRESHOLD=0                 # 连续失败多少次后切换账号 (0为禁用)。
+    # MAX_RETRIES=3                       # 单个请求的最大重试次数。
+    # RETRY_DELAY=3000                    # 每次重试之间的延迟 (毫秒)。
+    # INITIAL_AUTH_INDEX=1                # 初始启动时使用的账号索引 (从1开始)。
+    # IMMEDIATE_SWITCH_STATUS_CODES=429,503 # 哪些HTTP状态码会立即触发账号切换。
+
+    # --- Redis 缓存 (可选) ---
+    # 描述: 用于缓存请求结果，减少重复调用。如果未设置 REDIS_URL，则禁用缓存。
+    # REDIS_URL=redis://redis:6379/0      # Redis 连接 URL。
+    # CACHE_TTL=300                       # 缓存有效期 (秒)。
+
+    # =================================================================
+    # ===================       浏览器自动化配置       ===================
+    # =================================================================
+
+    # --- 自动化目标 (JSON格式) ---
+    # 描述: 这是一个 JSON 字符串，定义了浏览器自动化操作的目标。
+    # 注意: 请确保这是一个单行的、合法的 JSON 字符串。
+    # AUTOMATION_TARGETS_JSON={"targetUrl":"https://aistudio.google.com/u/0/apps/bundled/blank?showAssistant=true&showCode=true","popupCloseButtons":["button:has-text('Got it')","button:has-text('✕')","button:has-text('close')"],"codeButtonClick":{"role":"button","name":"Code","exact":true},"editorSelector":"div.monaco-editor","previewButton":{"role":"button","name":"Preview"}}
     ```
 
 4.  📁 **创建本地目录与准备认证文件**:
