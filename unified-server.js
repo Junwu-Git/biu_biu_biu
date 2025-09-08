@@ -354,7 +354,7 @@ class BrowserManager {
         } catch (error) {
           this.logger.warn(`[浏览器] 页面加载尝试 #${attempt} 失败: ${error.message}`);
           const errorScreenshotPath = path.join(debugFolder, `failed-nav-${authIndex}-${attempt}-${Date.now()}.png`);
-          await this.page.screenshot({ path: errorScreenshotPath, fullPage: true }).catch(() => {});
+          if (this.page) await this.page.screenshot({ path: errorScreenshotPath, fullPage: true }).catch(() => {});
           this.logger.info(`[浏览器] 失败截图已保存: ${errorScreenshotPath}`);
 
           if (attempt < maxNavRetries) {
@@ -406,7 +406,7 @@ class BrowserManager {
       } catch (err) {
           this.logger.error('[浏览器] 在判断或切换至Code视图过程中遭遇致命错误。', err);
           const failurePath = path.join(debugFolder, `FAILURE_at_code_click_logic_${Date.now()}.png`);
-          await this.page.screenshot({ path: failurePath, fullPage: true }).catch(e => this.logger.error(`[调试] 截取失败截图时出错: ${e.message}`));
+          if (this.page) await this.page.screenshot({ path: failurePath, fullPage: true }).catch(e => this.logger.error(`[调试] 截取失败截图时出错: ${e.message}`));
           this.logger.info(`[调试] 失败时的截图已保存: ${failurePath}`);
           throw err;
       }
@@ -430,10 +430,25 @@ class BrowserManager {
       this.logger.info('==================================================');
     } catch (error) {
       this.logger.error(`❌ [浏览器] 账号 ${authIndex} 初始化失败: ${error.message}`);
-      // B方案特性：失败时不关闭整个浏览器，只清理上下文
-      if (this.context) {
-        await this.context.close().catch(e => this.logger.error(`[浏览器] 关闭失败的上下文时出错: ${e.message}`));
-        this.context = null; this.page = null;
+
+      if (error.message.includes('Target page, context or browser has been closed')) {
+        this.logger.error('[系统] 检测到浏览器实例已损坏，将强制销毁并重置。');
+        try {
+            if (this.browser) {
+                await this.browser.close();
+            }
+        } catch (closeErr) {
+            this.logger.warn('[系统] 在关闭已损坏的浏览器时发生错误:', closeErr.message);
+        }
+        this.browser = null;
+        this.page = null;
+        this.context = null;
+      } else {
+        // 对于非致命错误，只清理上下文
+        if (this.context) {
+          await this.context.close().catch(e => this.logger.error(`[浏览器] 关闭失败的上下文时出错: ${e.message}`));
+          this.context = null; this.page = null;
+        }
       }
       throw error;
     }
@@ -1553,6 +1568,18 @@ async function initializeServer() {
   try {
     const serverSystem = new ProxyServerSystem();
     await serverSystem.start();
+
+    const cleanup = async () => {
+      console.log('[系统] 收到关闭信号，正在进行清理...');
+      if (serverSystem && serverSystem.browserManager) {
+        await serverSystem.browserManager.closeBrowser();
+        console.log('[系统] 浏览器已关闭。');
+      }
+      process.exit(0);
+    };
+
+    process.on('SIGINT', cleanup);
+    process.on('SIGTERM', cleanup);
   } catch (error) {
     console.error('❌ 服务器启动失败:', error.message);
     process.exit(1);
